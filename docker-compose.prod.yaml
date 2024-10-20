@@ -7,18 +7,18 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    image: optimaltech-docker
+    image: optimaltech-docker:0.1
     container_name: productRegistrationApi
     restart: always # reiniciar el contenedor si se detiene
     ports:
       - "${PORT}:${PORT}"
     environment:
-      - DB_HOST:${DB_HOST}
-      - DB_PORT:${DB_PORT}
-      - DB_NAME:${DB_NAME}
-      - DB_USERNAME:${DB_USERNAME}
-      - DB_PASSWORD:${DB_PASSWORD}
-      - PORT:${PORT}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - PORT=${PORT}
 
 
   db:
