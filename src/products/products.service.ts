@@ -1,93 +1,77 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { IProduct } from './interfaces/product.interface';
-import { CreateProductDto } from './DTO/create-product.dto';
+import { CreateProductDto } from './dto/create-product.dto';
 import { v4 as uuid } from 'uuid';
-import slug from 'slugify';
-import { UpdateProductDto } from './DTO/update-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Product } from './entities/product.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class ProductsService {
-  private products: IProduct[] = [
-    {
-      id: uuid(),
-      name: 'IPhone 16 pro max',
-      slug: 'iphone-16-pro-max',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: uuid(),
-      name: 'IPhone 15 pro max',
-      slug: 'iphone-15-pro-max',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: uuid(),
-      name: 'IPhone 14 pro max',
-      slug: 'iphone-14-pro-max',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ];
+  private readonly logger = new Logger('ProductsService');
+
+  constructor(
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+  ) {}
 
   findAll() {
-    return this.products;
+    return this.productRepository.find({});
   }
 
-  findOneById(id: string) {
-    const product = this.products.find((product) => product.id === id);
+  async findOneById(id: string) {
+    const product = await this.productRepository.findOneBy({ id });
     if (!product)
       throw new NotFoundException(`Product with id '${id}' not found`);
 
     return product;
   }
 
-  create(createProductDto: CreateProductDto) {
-    const product: IProduct = {
-      id: uuid(),
-      ...createProductDto,
-      slug: slug(createProductDto.name),
-      createdAt: new Date(),
-    };
-
-    this.products.push(product);
-
-    return product;
+  async create(createProductDto: CreateProductDto) {
+    try {
+      const productDb = await this.productRepository.create(createProductDto);
+      await this.productRepository.save(productDb);
+      return productDb;
+    } catch (error) {
+      this.handleDBExceptions(error);
+    }
   }
 
-  update(id: string, updateProductDto: UpdateProductDto) {
-    let productDB = this.findOneById(id);
-
-    if (updateProductDto.id && updateProductDto.id !== id)
-      throw new BadRequestException(`Product id is not valid inside body`);
-
-    this.products = this.products.map((product) => {
-      if (product.id === id) {
-        productDB = {
-          ...productDB,
-          ...updateProductDto,
-          id,
-          updatedAt: new Date(),
-        };
-        if (updateProductDto.name) {
-          productDB.slug = slug(updateProductDto.name);
-        }
-        return productDB;
-      }
-
-      return product;
+  async update(id: string, updateProductDto: UpdateProductDto) {
+    let product = await this.productRepository.preload({
+      id: id,
+      ...updateProductDto,
     });
 
-    return productDB;
+    if (!product)
+      throw new NotFoundException(`Product with id: ${id} not found`);
+
+    try {
+      await this.productRepository.save(product);
+      return product;
+    } catch (error) {
+      this.handleDBExceptions(error);
+    }
   }
 
-  delete(id: string) {
-    const product = this.findOneById(id);
-    this.products = this.products.filter((product) => product.id !== id);
+  async delete(id: string) {
+    const product = await this.findOneById(id);
+    return await this.productRepository.remove(product);
+  }
+
+  private handleDBExceptions(error: any) {
+    this.logger.error(error);
+
+    if (error.code === '23505') throw new BadRequestException(error.detail);
+
+    throw new InternalServerErrorException(
+      'Unexpected error, check server logs',
+    );
   }
 }
