@@ -6,11 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
-import { v4 as uuid } from 'uuid';
+import { validate as isUUID } from 'uuid';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { Repository } from 'typeorm';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @Injectable()
 export class ProductsService {
@@ -21,8 +22,31 @@ export class ProductsService {
     private readonly productRepository: Repository<Product>,
   ) {}
 
-  findAll() {
-    return this.productRepository.find({});
+  async findAll(paginationDto: PaginationDto) {
+    const { filter, limit = 10, page = 1 } = paginationDto;
+    const skip = (page - 1) * limit;
+
+    const query = this.productRepository.createQueryBuilder('product');
+    if (filter) {
+      if (isUUID(filter)) {
+        query.where('product.id = :filter', { filter });
+      } else {
+        query.where('product.name LIKE :filter OR product.slug LIKE :filter', {
+          filter: `%${filter}%`, // Usamos LIKE para búsquedas parciales
+        });
+      }
+    }
+    query.orderBy('product.createdAt', "DESC");
+    const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+
+    return {
+      products: data,
+      paginate: {
+        total,
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOneById(id: string) {

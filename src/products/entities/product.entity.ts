@@ -21,23 +21,23 @@ export class Product {
   slug: string;
 
   @Column('timestamptz', {
-    default: new Date(),
+    default: () => 'CURRENT_TIMESTAMP',
   })
   createdAt: Date;
 
   @Column('timestamptz', {
-    default: new Date(),
+    default: () => 'CURRENT_TIMESTAMP',
   })
   updatedAt?: Date;
 
   @BeforeInsert()
   checkSlugInsert() {
-    this.slug = slug(this.name);
+    this.slug = slug(this.name.toLowerCase());
   }
 
   @BeforeUpdate()
   checkSlugUpdate() {
-    this.slug = slug(this.name);
+    this.slug = slug(this.name.toLowerCase());
     this.updatedAt = new Date();
   }
 }
