@@ -25,7 +25,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, any> {
           {
             status: 'error',
             message: err.message || 'An error occurred',
-            error: err.response || err,
+            error: err?.response?.error,
           },
           err.status,
         );
